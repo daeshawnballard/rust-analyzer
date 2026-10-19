@@ -564,6 +564,31 @@ mod slice {
 }
 
 #[test]
+fn doc_links_primitive_slice_external_impl() {
+    check_doc_links(
+        r#"
+//- /core.rs crate:core
+pub mod slice {
+    #[lang = "slice"]
+    impl<T> [T] {}
+    #[doc(hidden)]
+    pub mod sort {}
+}
+//- /alloc.rs crate:alloc deps:core
+impl<T> [T] {
+    #[rustc_allow_incoherent_impl]
+    pub fn sort(&mut self) {}
+        // ^^^^ slice::sort
+}
+//- /main.rs crate:main deps:core,alloc
+use core::slice;
+/// [`slice::sort`]
+struct S$0;
+"#,
+    )
+}
+
+#[test]
 fn doc_links_inherent_impl_items() {
     check_doc_links(
         r#"

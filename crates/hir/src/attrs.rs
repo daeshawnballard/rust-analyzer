@@ -355,8 +355,12 @@ fn resolve_doc_path_on_(
         && resolved.take_values().is_none()
         && let Some(def) = resolve_slice_assoc_item(db, resolver.clone(), &modpath, ns)
     {
-        // Without a disambiguator, a method and an item in another namespace are ambiguous.
-        if ns.is_none() && !resolved.is_none() {
+        // Like rustdoc, ignore doc-hidden items when checking for ambiguity.
+        if ns.is_none()
+            && resolved.iter_items().any(|(item, _)| {
+                crate::ItemInNs::from(item).attrs(db).is_none_or(|attrs| !attrs.is_doc_hidden())
+            })
+        {
             return None;
         }
         return Some(def);
@@ -396,7 +400,10 @@ fn resolve_slice_assoc_item(
         return None;
     }
 
-    let ty = Type::new_slice(db, Type::unknown());
+    let ty = Type {
+        owner: crate::TypeOwnerId::NoParams(resolver.krate()),
+        ..Type::new_slice(db, Type::unknown())
+    };
     resolve_assoc_item(db, &ty, item, ns)
         .or_else(|| resolve_impl_trait_item(db, resolver, &ty, item, ns))
 }
