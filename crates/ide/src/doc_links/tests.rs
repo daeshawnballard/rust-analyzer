@@ -570,7 +570,10 @@ fn doc_links_primitive_slice_external_impl() {
 //- /core.rs crate:core
 pub mod slice {
     #[lang = "slice"]
-    impl<T> [T] {}
+    impl<T> [T] {
+        pub fn copy_within(&mut self) {}
+            // ^^^^^^^^^^^ slice::copy_within
+    }
     #[doc(hidden)]
     pub mod sort {}
 }
@@ -582,7 +585,7 @@ impl<T> [T] {
 }
 //- /main.rs crate:main deps:core,alloc
 use core::slice;
-/// [`slice::sort`]
+/// [`slice::sort`] [`slice::copy_within`]
 struct S$0;
 "#,
     )

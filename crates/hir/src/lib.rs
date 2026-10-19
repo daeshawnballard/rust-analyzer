@@ -5217,7 +5217,9 @@ impl<'db> Type<'db> {
     ) -> Option<T> {
         let mut slot = None;
         self.iterate_assoc_items_dyn(db, &mut |assoc_item_id| {
-            slot = callback(assoc_item_id.into());
+            if slot.is_none() {
+                slot = callback(assoc_item_id.into());
+            }
             slot.is_some()
         });
         slot
