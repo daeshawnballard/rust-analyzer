@@ -350,6 +350,10 @@ fn resolve_doc_path_on_(
 
     let mut modpath = doc_modpath_from_str(link)?;
 
+    if let Some(def) = resolve_slice_assoc_item(db, resolver.clone(), &modpath, ns) {
+        return Some(def);
+    }
+
     let resolved = resolver.resolve_module_path_in_items(db, &modpath);
     if resolved.is_none() {
         let last_name = modpath.pop_segment()?;
@@ -367,6 +371,27 @@ fn resolve_doc_path_on_(
         };
         Some(DocLinkDef::ModuleDef(def?.into()))
     }
+}
+
+fn resolve_slice_assoc_item(
+    db: &dyn HirDatabase,
+    resolver: Resolver<'_>,
+    modpath: &ModPath,
+    ns: Option<Namespace>,
+) -> Option<DocLinkDef> {
+    if modpath.kind != PathKind::Plain {
+        return None;
+    }
+    let [primitive, item] = modpath.segments() else {
+        return None;
+    };
+    if primitive.as_str() != "slice" {
+        return None;
+    }
+
+    let ty = Type::new_slice(db, Type::unknown());
+    resolve_assoc_item(db, &ty, item, ns)
+        .or_else(|| resolve_impl_trait_item(db, resolver, &ty, item, ns))
 }
 
 fn resolve_assoc_or_field(

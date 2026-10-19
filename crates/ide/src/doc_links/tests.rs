@@ -488,6 +488,71 @@ mod module {}
 }
 
 #[test]
+fn doc_links_primitive_slice_method_prefers_primitive() {
+    let (analysis, position) = fixture::position(
+        r#"
+//- minicore: slice
+/// [`slice::len`]
+struct S$0;
+
+mod slice {
+    pub mod len {}
+}
+"#,
+    );
+    let sema = &Semantics::new(&analysis.db);
+    let (cursor_def, _) = def_under_cursor(sema, &position);
+    let resolved = hir::attach_db(sema.db, || {
+        resolve_doc_path_for_def(sema.db, cursor_def, "slice::len", None, hir::IsInnerDoc::No)
+    });
+
+    assert!(matches!(
+        resolved,
+        Some(Definition::Function(func))
+            if func.name(sema.db).as_str() == "len"
+    ));
+}
+
+#[test]
+fn doc_links_primitive_slice_method_falls_back_to_module() {
+    let (analysis, position) = fixture::position(
+        r#"
+//- minicore: slice
+/// [`slice::len`]
+struct S$0;
+
+mod slice {
+    pub mod len {}
+    pub mod other {}
+}
+"#,
+    );
+    let sema = &Semantics::new(&analysis.db);
+    let (cursor_def, _) = def_under_cursor(sema, &position);
+    let (type_namespace, non_method) = hir::attach_db(sema.db, || {
+        (
+            resolve_doc_path_for_def(
+                sema.db,
+                cursor_def,
+                "slice::len",
+                Some(hir::Namespace::Types),
+                hir::IsInnerDoc::No,
+            ),
+            resolve_doc_path_for_def(
+                sema.db,
+                cursor_def,
+                "slice::other",
+                None,
+                hir::IsInnerDoc::No,
+            ),
+        )
+    });
+
+    assert!(matches!(type_namespace, Some(Definition::Module(_))));
+    assert!(matches!(non_method, Some(Definition::Module(_))));
+}
+
+#[test]
 fn doc_links_inherent_impl_items() {
     check_doc_links(
         r#"
