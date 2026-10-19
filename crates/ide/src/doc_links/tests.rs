@@ -488,16 +488,12 @@ mod module {}
 }
 
 #[test]
-fn doc_links_primitive_slice_method_prefers_primitive() {
+fn doc_links_primitive_slice_method() {
     let (analysis, position) = fixture::position(
         r#"
 //- minicore: slice
 /// [`slice::len`]
 struct S$0;
-
-mod slice {
-    pub mod len {}
-}
 "#,
     );
     let sema = &Semantics::new(&analysis.db);
@@ -514,42 +510,57 @@ mod slice {
 }
 
 #[test]
-fn doc_links_primitive_slice_method_falls_back_to_module() {
+fn doc_links_primitive_slice_method_namespaces() {
     let (analysis, position) = fixture::position(
         r#"
 //- minicore: slice
-/// [`slice::len`]
+/// [`slice::len`] [`slice::len()`]
 struct S$0;
 
 mod slice {
     pub mod len {}
-    pub mod other {}
 }
 "#,
     );
     let sema = &Semantics::new(&analysis.db);
     let (cursor_def, _) = def_under_cursor(sema, &position);
-    let (type_namespace, non_method) = hir::attach_db(sema.db, || {
+    let (ambiguous, value_namespace) = hir::attach_db(sema.db, || {
         (
+            resolve_doc_path_for_def(sema.db, cursor_def, "slice::len", None, hir::IsInnerDoc::No),
             resolve_doc_path_for_def(
                 sema.db,
                 cursor_def,
                 "slice::len",
-                Some(hir::Namespace::Types),
-                hir::IsInnerDoc::No,
-            ),
-            resolve_doc_path_for_def(
-                sema.db,
-                cursor_def,
-                "slice::other",
-                None,
+                Some(hir::Namespace::Values),
                 hir::IsInnerDoc::No,
             ),
         )
     });
 
-    assert!(matches!(type_namespace, Some(Definition::Module(_))));
-    assert!(matches!(non_method, Some(Definition::Module(_))));
+    assert!(ambiguous.is_none());
+    assert!(matches!(
+        value_namespace,
+        Some(Definition::Function(func))
+            if func.name(sema.db).as_str() == "len"
+    ));
+}
+
+#[test]
+fn doc_links_primitive_slice_module_paths() {
+    check_doc_links(
+        r#"
+//- minicore: slice
+/// [`type@slice::len`] [`slice::other`]
+struct S$0;
+
+mod slice {
+    pub mod len {}
+         // ^^^ slice::len
+    pub mod other {}
+         // ^^^^^ slice::other
+}
+"#,
+    )
 }
 
 #[test]

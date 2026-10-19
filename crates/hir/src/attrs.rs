@@ -350,11 +350,18 @@ fn resolve_doc_path_on_(
 
     let mut modpath = doc_modpath_from_str(link)?;
 
-    if let Some(def) = resolve_slice_assoc_item(db, resolver.clone(), &modpath, ns) {
+    let resolved = resolver.resolve_module_path_in_items(db, &modpath);
+    if matches!(ns, None | Some(Namespace::Values))
+        && resolved.take_values().is_none()
+        && let Some(def) = resolve_slice_assoc_item(db, resolver.clone(), &modpath, ns)
+    {
+        // Without a disambiguator, a method and an item in another namespace are ambiguous.
+        if ns.is_none() && !resolved.is_none() {
+            return None;
+        }
         return Some(def);
     }
 
-    let resolved = resolver.resolve_module_path_in_items(db, &modpath);
     if resolved.is_none() {
         let last_name = modpath.pop_segment()?;
         resolve_assoc_or_field(db, resolver, modpath, last_name, ns)
